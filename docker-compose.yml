@@ -25,7 +25,13 @@ services:
     volumes:
       # Explicit configuration file mount
       - "/var/lib/containers/grafana/config/grafana.ini:/etc/grafana/grafana.ini:ro"
-      - "/var/lib/containers/grafana/provisioning/api:/etc/grafana/provisioning/api:ro"
+
+      # FIX: one mount for the whole provisioning/ tree instead of
+      # separate per-subdirectory mounts — see docker-compose.yml.j2 for
+      # the full explanation. Classic provisioning scans the directory
+      # itself, so this is all Grafana needs to see everything the role
+      # stages (dashboards, datasources, alerting).
+      - "/var/lib/containers/grafana/provisioning:/etc/grafana/provisioning:ro"
 
       # Explicit unified storage mount (Houses the backend SQLite database for API objects)
       - "/var/lib/containers/grafana/data:/usr/share/grafana/data:rw"
