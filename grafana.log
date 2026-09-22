@@ -1,0 +1,51 @@
+[root@std1 compose]# docker logs grafana --tail 50
+logger=ngalert.sender.router rule_uid=lowdiskspace org_id=1 t=2026-09-22T18:40:29.012947567Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-any-temp-critical org_id=1 t=2026-09-22T18:40:40.014084962Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-cpu-temp org_id=1 t=2026-09-22T18:40:41.262681103Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T18:40:42.512618519Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-exhaust-temp org_id=1 t=2026-09-22T18:40:43.762704814Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-health org_id=1 t=2026-09-22T18:40:45.013031499Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-inlet-temp org_id=1 t=2026-09-22T18:40:46.265040447Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-raiddegraded org_id=1 t=2026-09-22T18:40:47.513684047Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-sel org_id=1 t=2026-09-22T18:40:48.763839065Z level=info msg="Sending alerts to local notifier" count=1
+logger=dashboard-service t=2026-09-22T18:40:58.966835891Z level=info msg="No last resource version found, starting from scratch" orgID=1
+logger=ngalert.sender.router rule_uid=highcpuload org_id=1 t=2026-09-22T18:41:20.020553461Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=highloadaverage org_id=1 t=2026-09-22T18:41:21.014242818Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=highmemoryusage org_id=1 t=2026-09-22T18:41:22.014286271Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=hostdown org_id=1 t=2026-09-22T18:41:23.016871055Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-highcpuload org_id=1 t=2026-09-22T18:41:24.014116989Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-highloadaverage org_id=1 t=2026-09-22T18:41:25.013352063Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-highmemoryusage org_id=1 t=2026-09-22T18:41:26.014668524Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-hostdown org_id=1 t=2026-09-22T18:41:27.01555551Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-lowdiskspace org_id=1 t=2026-09-22T18:41:28.014195699Z level=info msg="Sending alerts to local notifier" count=1
+logger=dashboard-service t=2026-09-22T18:41:28.968054375Z level=info msg="No last resource version found, starting from scratch" orgID=1
+logger=ngalert.sender.router rule_uid=lowdiskspace org_id=1 t=2026-09-22T18:41:29.012622583Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-any-temp-critical org_id=1 t=2026-09-22T18:41:40.014920149Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-cpu-temp org_id=1 t=2026-09-22T18:41:41.265600334Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T18:41:42.525860084Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-exhaust-temp org_id=1 t=2026-09-22T18:41:43.762556593Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-health org_id=1 t=2026-09-22T18:41:45.01363386Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-inlet-temp org_id=1 t=2026-09-22T18:41:46.264998431Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-raiddegraded org_id=1 t=2026-09-22T18:41:47.512356639Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-sel org_id=1 t=2026-09-22T18:41:48.763009999Z level=info msg="Sending alerts to local notifier" count=1
+logger=dashboard-service t=2026-09-22T18:41:58.967717854Z level=info msg="No last resource version found, starting from scratch" orgID=1
+logger=ngalert.sender.router rule_uid=highcpuload org_id=1 t=2026-09-22T18:42:20.012721415Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=highloadaverage org_id=1 t=2026-09-22T18:42:21.012085179Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=highmemoryusage org_id=1 t=2026-09-22T18:42:22.012696921Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=hostdown org_id=1 t=2026-09-22T18:42:23.012268463Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-highcpuload org_id=1 t=2026-09-22T18:42:24.012258125Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-highloadaverage org_id=1 t=2026-09-22T18:42:25.012065182Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-highmemoryusage org_id=1 t=2026-09-22T18:42:26.019258668Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-hostdown org_id=1 t=2026-09-22T18:42:27.010695025Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=linux-lowdiskspace org_id=1 t=2026-09-22T18:42:28.012020482Z level=info msg="Sending alerts to local notifier" count=1
+logger=dashboard-service t=2026-09-22T18:42:28.966750323Z level=info msg="No last resource version found, starting from scratch" orgID=1
+logger=ngalert.sender.router rule_uid=lowdiskspace org_id=1 t=2026-09-22T18:42:29.012093516Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-any-temp-critical org_id=1 t=2026-09-22T18:42:40.012937219Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-cpu-temp org_id=1 t=2026-09-22T18:42:41.262006188Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T18:42:42.511897216Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-exhaust-temp org_id=1 t=2026-09-22T18:42:43.761747282Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-health org_id=1 t=2026-09-22T18:42:45.011029198Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-inlet-temp org_id=1 t=2026-09-22T18:42:46.263362092Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-raiddegraded org_id=1 t=2026-09-22T18:42:47.512526492Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-sel org_id=1 t=2026-09-22T18:42:48.762330909Z level=info msg="Sending alerts to local notifier" count=1
+logger=dashboard-service t=2026-09-22T18:42:58.966695736Z level=info msg="No last resource version found, starting from scratch" orgID=1
