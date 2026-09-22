@@ -1,6 +1,10 @@
 ---
 # tasks file for configure_grafana_stack
-# Grafana version 13 draft
+# Reverted to provisioning-based dashboards/datasources/alerting (v12
+# behavior) while keeping the v13 phase structure. push-api-payloads.yml
+# (the /apis/dashboard.grafana.app/v2/... REST import) is left on disk
+# but no longer included here — Grafana picks up dashboards, datasources,
+# and alerting straight from provisioning/ now, no API calls needed.
 
 # ───────────────────────────────────────────────
 # Phase 1: Environment & File Prep
@@ -29,12 +33,6 @@
   ansible.builtin.command: /var/lib/containers/compose/run.sh
   vars:
     ansible_python_interpreter: /usr/bin/python3
-
-# ───────────────────────────────────────────────
-# Phase 3: Unified Storage Injection Suite
-# ───────────────────────────────────────────────
-- name: Execute Unified API provisioning stack
-  ansible.builtin.include_tasks: push-api-payloads.yml
 
 # ───────────────────────────────────────────────
 # README Generation
