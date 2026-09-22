@@ -1,0 +1,52 @@
+/opt/ansible/files/grafana/fy26q4/grafana
+
+.
+├── archive
+│   ├── grafana.ini.j2
+│   ├── grafana.ini.j2.prod
+│   ├── grafana.ini.orig
+│   ├── grafana.ks
+│   └── grafana-vm-build-instructions.txt
+├── config
+│   ├── archive
+│   │   ├── grafana.ini
+│   │   └── grafana.old
+│   ├── grafana.ini
+│   ├── grafana.ini.j2
+│   └── grafana.old
+├── node-exporter.sh
+├── provisioning
+│   ├── alerting
+│   │   ├── archive
+│   │   │   ├── contact-points.yml
+│   │   │   ├── idrac-alerts.yml
+│   │   │   ├── linux-alerts.yml
+│   │   │   ├── notification-policies.yml
+│   │   │   ├── notification-policies.yml.j2
+│   │   │   └── windows-alerts.yml
+│   │   ├── contact-points.json
+│   │   ├── contact-points.yml
+│   │   ├── idrac-alerts.json
+│   │   ├── idrac-alerts.yml
+│   │   ├── linux-alerts.json
+│   │   ├── linux-alerts.yml
+│   │   ├── notification-policies.json
+│   │   ├── notification-policies.yml
+│   │   ├── notification-policies.yml.j2
+│   │   ├── windows-alerts.json
+│   │   └── windows-alerts.yml
+│   ├── api
+│   │   ├── grafana_api_config.json
+│   │   └── grafana_api_config.json.j2
+│   ├── dashboards
+│   │   ├── default.yml
+│   │   ├── nuc_idrac_dashboard.json
+│   │   ├── nuc_linux_dashboard.json
+│   │   └── nuc_windows_dashboard.json
+│   ├── datasources
+│   │   ├── datasource.json
+│   │   ├── prometheus.yml
+│   │   └── prometheus.yml.j2
+│   └── plugins
+├── runtime_vars.yml.j2
+└── windows-exporter.ps1
