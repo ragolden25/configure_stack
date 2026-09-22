@@ -1,0 +1,283 @@
+---
+# tasks file for staging environment foundations
+
+- name: Load versions.env manually
+  ansible.builtin.set_fact:
+    version_vars: "{{ version_vars | default({}) | combine({ item.split('=')[0]: item.split('=')[1] }) }}"
+  loop: "{{ lookup('file', grafana_stack_artifact_dir + '/versions.env').splitlines() }}"
+
+- name: Promote version_vars into individual facts
+  ansible.builtin.set_fact:
+    grafana_version: "{{ version_vars.GRAFANA_VERSION }}"
+    prometheus_version: "{{ version_vars.PROMETHEUS_VERSION }}"
+    nginx_version: "{{ version_vars.NGINX_VERSION }}"
+    idrac_version: "{{ version_vars.IDRAC_VERSION }}"
+
+
+- name: Ensure quarter variable is defined
+  ansible.builtin.assert:
+    that:
+      - quarter is defined
+      - quarter | length > 0
+    fail_msg: "The 'quarter' variable must be provided (e.g., fy26q2)."
+
+- name: Ensure log directory exists on control node
+  ansible.builtin.file:
+    path: /opt/ansible/logs
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+
+- name: Stop legacy and current containers
+  ansible.builtin.shell: |
+    docker stop influxdb telegraf grafana prometheus nginx idrac_exporter || true
+    docker rm -f influxdb telegraf grafana prometheus nginx idrac_exporter || true
+  changed_when: false
+
+- name: Rebuild pristine base root directory
+  ansible.builtin.file:
+    path: /var/lib/containers
+    state: "{{ item }}"
+  loop: [ 'absent', 'directory' ]
+
+- name: Ensure container directories exist with correct ownership
+  ansible.builtin.file:
+    path: "/var/lib/containers/{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+    owner: "{{ item.uid }}"
+    group: "{{ item.uid }}"
+  loop:
+    - { path: compose, mode: '0755', uid: 0 }
+    - { path: grafana, mode: '0755', uid: '65532' }
+    - { path: grafana/data, mode: '0755', uid: '65532' }
+    - { path: grafana/config, mode: '0755', uid: '65532' }
+    - { path: grafana/provisioning, mode: '0755', uid: '65532' }
+    - { path: grafana/provisioning/alerting, mode: '0755', uid: '65532' }
+    - { path: grafana/provisioning/api, mode: '0755', uid: '65532' }
+    - { path: grafana/provisioning/dashboards, mode: '0755', uid: '65532' }
+    - { path: grafana/provisioning/datasources, mode: '0755', uid: '65532' }
+    - { path: nginx, mode: '0755', uid: '65532' }
+    - { path: nginx/conf.d, mode: '0755', uid: '65532' }
+    - { path: nginx/certs, mode: '0755', uid: '65532' }
+    - { path: nginx/cache, mode: '0755', uid: '65532' }
+    - { path: nginx/log, mode: '0755', uid: '65532' }
+    - { path: nginx/run, mode: '0755', uid: '65532' }
+    - { path: prometheus, mode: '0755', uid: '65532' }
+    - { path: prometheus/config, mode: '0755', uid: '65532' }
+    - { path: prometheus/data, mode: '0755', uid: '65532' }
+    - { path: idrac, mode: '0755', uid: 0 }
+    - { path: gpgkeys, mode: '0755', uid: 0 }
+    - { path: images, mode: '0755', uid: 0 }
+
+- name: Copy static configuration files
+  ansible.builtin.copy:
+    src: "{{ grafana_stack_artifact_dir }}/{{ item.src }}"
+    dest: "/var/lib/containers/{{ item.dest }}"
+    owner: "{{ item.owner | default('65532') }}"
+    group: "{{ item.owner | default('65532') }}"
+    mode: '0644'
+  loop:
+    - { src: 'grafana/provisioning/api/grafana_api_config.json', dest: 'grafana/provisioning/api/grafana_api_config.json' }
+    - { src: 'prometheus/prometheus.yml', dest: 'prometheus/prometheus.yml' }
+    - { src: 'idrac/idrac.yml', dest: 'idrac/idrac.yml', owner: '0' }
+    - { src: 'nginx/nginx.conf', dest: 'nginx/nginx.conf' }
+    - { src: 'nginx/mime.types', dest: 'nginx/mime.types' }
+    - { src: 'nginx/options-ssl-nginx.conf', dest: 'nginx/options-ssl-nginx.conf' }
+    - { src: 'nginx/ssl-dhparams.pem', dest: 'nginx/ssl-dhparams.pem' }
+    - { src: 'nginx/conf.d/grafana.conf', dest: 'nginx/conf.d/grafana.conf' }
+
+- name: Copy loop variables for dashboards and certs
+  ansible.builtin.copy:
+    src: "{{ grafana_stack_artifact_dir }}/{{ item.dir }}/{{ item.file }}"
+    dest: "/var/lib/containers/{{ item.dir }}/{{ item.file }}"
+    owner: '65532'
+    group: '65532'
+    mode: '0644'
+  loop:
+    - { dir: 'grafana/provisioning/dashboards', file: 'nuc_idrac_dashboard.json' }
+    - { dir: 'grafana/provisioning/dashboards', file: 'nuc_linux_dashboard.json' }
+    - { dir: 'grafana/provisioning/dashboards', file: 'nuc_windows_dashboard.json' }
+    - { dir: 'nginx/certs', file: 'std1-castore.pem' }
+    - { dir: 'nginx/certs', file: 'std1.key' }
+
+- name: Copy Grafana alerting configuration payloads
+  ansible.builtin.copy:
+    src: "{{ grafana_stack_artifact_dir }}/grafana/provisioning/alerting/{{ item }}"
+    dest: "/var/lib/containers/grafana/provisioning/alerting/{{ item }}"
+    owner: '65532'
+    group: '65532'
+    mode: '0644'
+  loop:
+    - contact-points.json
+    - idrac-alerts.json
+    - linux-alerts.json
+    - notification-policies.json
+    - windows-alerts.json
+
+- name: Copy Grafana Prometheus datasource configuration payload
+  ansible.builtin.copy:
+    src: "{{ grafana_stack_artifact_dir }}/grafana/provisioning/datasources/datasource.json"
+    dest: "/var/lib/containers/grafana/provisioning/datasources/datasource.json"
+    owner: '65532'
+    group: '65532'
+    mode: '0644'
+
+- name: Create grafana.access.log
+  ansible.builtin.file:
+    path: /var/lib/containers/nginx/log/grafana.access.log
+    state: touch
+    owner: '65532'
+    group: '65532'
+    mode: '0644'
+
+- name: Create error.log
+  ansible.builtin.file:
+    path: /var/lib/containers/nginx/log/error.log
+    state: touch
+    owner: '65532'
+    group: '65532'
+    mode: '0644'
+
+- name: Install hardened nsswitch.conf for NGINX DNS resolution
+  ansible.builtin.copy:
+    dest: /var/lib/containers/nginx/nsswitch.conf
+    owner: '65532'
+    group: '65532'
+    mode: '0644'
+    content: |
+      hosts: files dns
+
+- name: Find nucleus images on control node
+  ansible.builtin.find:
+    paths: "/opt/ansible/files/grafana/{{ quarter }}/images"
+    patterns: "nucleus-*.tar.gz"
+  register: nucleus_src_images
+  delegate_to: localhost
+
+- name: Copy nucleus images to target host
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "/var/lib/containers/images/{{ item.path | basename }}"
+    mode: '0640'
+  loop: "{{ nucleus_src_images.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Copy GPG public key
+  ansible.builtin.copy:
+    src: "/opt/ansible/files/grafana/{{ quarter }}/gpgkeys/ansible.pub"
+    dest: "/var/lib/containers/gpgkeys/ansible.pub"
+    mode: '0644'
+
+- name: Import GPG public key
+  ansible.builtin.shell: |
+    gpg --import /var/lib/containers/gpgkeys/ansible.pub
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Find nucleus signature files
+  ansible.builtin.find:
+    paths: "/opt/ansible/files/grafana/{{ quarter }}/provenance/nucleus"
+    patterns: "nucleus-*.tar.gz.asc"
+  register: nucleus_signature_files
+  delegate_to: localhost
+
+- name: Copy nucleus signature files to target host
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "/var/lib/containers/images/{{ item.path | basename }}"
+    mode: '0640'
+  loop: "{{ nucleus_signature_files.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Verify GPG signatures for all nucleus images
+  ansible.builtin.shell: |
+    gpg --trust-model always \
+        --verify "/var/lib/containers/images/{{ item.path | basename }}.asc" \
+                 "/var/lib/containers/images/{{ item.path | basename }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ nucleus_src_images.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: gpg_verify
+  failed_when: gpg_verify.rc != 0
+
+- name: Find hardened nucleus images on target
+  ansible.builtin.find:
+    paths: "/var/lib/containers/images"
+    patterns: "nucleus-*.tar.gz"
+  register: found_images
+
+- name: Fail if no nucleus images found
+  ansible.builtin.fail:
+    msg: "No nucleus images found on target host."
+  when: found_images.files | length == 0
+
+- name: Load ALL verified nucleus images
+  ansible.builtin.shell: docker load -i "{{ item.path }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ found_images.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Copy docker-compose.yml
+  ansible.builtin.copy:
+    src: "{{ grafana_stack_artifact_dir }}/docker-compose.yml"
+    dest: /var/lib/containers/compose/docker-compose.yml
+    mode: '0644'
+    owner: 'root'
+    group: 'root'
+
+- name: Create run.sh
+  ansible.builtin.copy:
+    dest: /var/lib/containers/compose/run.sh
+    content: |
+      #!/bin/bash
+      docker compose -f /var/lib/containers/compose/docker-compose.yml up -d
+    mode: '0700'
+
+- name: Create stop.sh
+  ansible.builtin.copy:
+    dest: /var/lib/containers/compose/stop.sh
+    content: |
+      #!/bin/bash
+      docker compose -f /var/lib/containers/compose/docker-compose.yml down
+    mode: '0700'
+
+- name: Configure Docker External Firewall by port
+  vars:
+    ansible_python_interpreter: /usr/libexec/platform-python
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+    zone: public
+  loop:
+    - "3000/tcp"
+    - "9191/tcp"
+    - "80/tcp"
+    - "443/tcp"
+
+- name: Render grafana.ini
+  ansible.builtin.template:
+    src: "{{ grafana_stack_artifact_dir }}/grafana/config/grafana.ini.j2"
+    dest: /var/lib/containers/grafana/config/grafana.ini
+    mode: '0644'
+    owner: '65532'
+    group: '65532'
+
+- name: Ensure ALL Grafana and Prometheus directories are owned by UID 65532
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: '65532'
+    group: '65532'
+    mode: '755'
+    recurse: yes
+  loop:
+    - /var/lib/containers/grafana
+    - /var/lib/containers/prometheus
