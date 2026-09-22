@@ -1,0 +1,117 @@
+Report: /opt/ansible/logs/grafana_troubleshoot_20260922T160341Z.log
+
+────────────────────────────────────────────────────────
+  1. Container status
+────────────────────────────────────────────────────────
+  [OK]   grafana: running (health: healthy)
+  [OK]   prometheus: running (health: healthy)
+  [OK]   nginx: running (health: healthy)
+  [OK]   idrac_exporter: running (health: healthy)
+
+────────────────────────────────────────────────────────
+  2. Grafana container logs (last 150 lines, filtered)
+────────────────────────────────────────────────────────
+  Full log saved to: /tmp/grafana-troubleshoot.F79XKS/grafana.log
+
+  --- Lines mentioning error/fail/panic/plugin ---
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T19:56:42.513327388Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T19:57:42.512327955Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T19:58:42.512106173Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T19:59:42.511767483Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T20:00:42.511977462Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T20:01:42.511690061Z level=info msg="Sending alerts to local notifier" count=1
+logger=ngalert.sender.router rule_uid=idrac-diskfailed org_id=1 t=2026-09-22T20:02:42.510950368Z level=info msg="Sending alerts to local notifier" count=1
+
+
+────────────────────────────────────────────────────────
+  3. Host-side provisioning files (what the role staged)
+────────────────────────────────────────────────────────
+  [OK]   dashboards/default.yml present, owned 65532:65532
+  [OK]   dashboards/nuc_idrac_dashboard.json present, owned 65532:65532
+  [OK]   dashboards/nuc_linux_dashboard.json present, owned 65532:65532
+  [OK]   dashboards/nuc_windows_dashboard.json present, owned 65532:65532
+  [OK]   datasources/prometheus.yml present, owned 65532:65532
+  [OK]   alerting/contact-points.yml present, owned 65532:65532
+  [OK]   alerting/idrac-alerts.yml present, owned 65532:65532
+  [OK]   alerting/linux-alerts.yml present, owned 65532:65532
+  [OK]   alerting/windows-alerts.yml present, owned 65532:65532
+  [OK]   alerting/notification-policies.yml present, owned 65532:65532
+
+  --- JSON syntax check (dashboards) ---
+  [OK]   nuc_idrac_dashboard.json: valid JSON
+  [OK]   nuc_linux_dashboard.json: valid JSON
+  [OK]   nuc_windows_dashboard.json: valid JSON
+
+  --- YAML syntax check (datasources, alerting) ---
+  [FAIL] prometheus.yml: INVALID YAML — this would stop provisioning for its whole file
+  [FAIL] contact-points.yml: INVALID YAML — this would stop provisioning for its whole file
+  [FAIL] idrac-alerts.yml: INVALID YAML — this would stop provisioning for its whole file
+  [FAIL] linux-alerts.yml: INVALID YAML — this would stop provisioning for its whole file
+  [FAIL] notification-policies.yml: INVALID YAML — this would stop provisioning for its whole file
+  [FAIL] windows-alerts.yml: INVALID YAML — this would stop provisioning for its whole file
+
+────────────────────────────────────────────────────────
+  4. What the grafana CONTAINER actually sees (via docker cp, no shell needed)
+────────────────────────────────────────────────────────
+  [OK]   copied /etc/grafana/provisioning out of the container
+  --- tree as seen inside the container ---
+  provisioning/alerting/contact-points.yml
+  provisioning/alerting/idrac-alerts.yml
+  provisioning/alerting/linux-alerts.yml
+  provisioning/alerting/notification-policies.yml
+  provisioning/alerting/windows-alerts.yml
+  provisioning/dashboards/default.yml
+  provisioning/dashboards/nuc_idrac_dashboard.json
+  provisioning/dashboards/nuc_linux_dashboard.json
+  provisioning/dashboards/nuc_windows_dashboard.json
+  provisioning/datasources/prometheus.yml
+  [OK]   container sees 4 file(s) under provisioning/dashboards
+  [OK]   container sees 1 file(s) under provisioning/datasources
+  [OK]   container sees 5 file(s) under provisioning/alerting
+
+  --- Bundled/plugins dirs (these are tmpfs — expected to be empty on every restart) ---
+  [WARN] data/plugins is empty inside the running container (tmpfs, wiped on every start — if any dashboard panel depends on a plugin normally unpacked here, this is your cause)
+  [WARN] data/plugins-bundled is empty inside the running container (tmpfs, wiped on every start — if any dashboard panel depends on a plugin normally unpacked here, this is your cause)
+
+────────────────────────────────────────────────────────
+  5. Live mounts and environment on the grafana container
+────────────────────────────────────────────────────────
+  --- Mounts ---
+  /var/lib/containers/grafana/config/grafana.ini -> /etc/grafana/grafana.ini (ro)
+  /var/lib/containers/grafana/provisioning -> /etc/grafana/provisioning (ro)
+  /var/lib/containers/grafana/data -> /usr/share/grafana/data (rw)
+
+  [OK]   single whole-tree provisioning mount is present (/etc/grafana/provisioning)
+
+  --- Relevant environment variables ---
+GF_SECURITY_ADMIN_PASSWORD=admin
+GF_SECURITY_DISABLE_INITIAL_ADMIN_PASSWORD_CHANGE=true
+GF_FEATURE_TOGGLES_provisioningService=true
+GF_PROVISIONING_DISABLE_PROVISIONING_DEFAULT_PLUGINS=true
+GF_PATHS_CONFIG=/etc/grafana/grafana.ini
+GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+GF_SECURITY_ADMIN_USER=admin
+
+────────────────────────────────────────────────────────
+  6. Grafana API checks (skipped if no admin creds passed)
+────────────────────────────────────────────────────────
+  --- Registered datasources ---
+  [OK]   1 datasource(s) registered in Grafana
+   - Prometheus prometheus http://prometheus:9191
+
+  --- Loaded dashboards ---
+  [OK]   3 dashboard(s) loaded
+   - Nucleus IDRAC Servers
+   - Nucleus Linux Servers
+   - Nucleus Windows Servers
+
+────────────────────────────────────────────────────────
+  SUMMARY
+────────────────────────────────────────────────────────
+  PASS: 24   WARN: 2   FAIL: 6
+  Full report: /opt/ansible/logs/grafana_troubleshoot_20260922T160341Z.log
+  Working files (logs, copied dirs): /tmp/grafana-troubleshoot.F79XKS  (not auto-deleted — remove manually when done)
+
+  Read the FAIL lines top to bottom — they're ordered so an earlier
+  failure (e.g. missing host file, stale compose mount) is usually
+  the root cause of a later one (e.g. 0 dashboards loaded).
