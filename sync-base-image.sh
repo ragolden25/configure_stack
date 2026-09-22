@@ -47,19 +47,22 @@ fi
 
 echo "[$(date)] container-forge GPG key imported and verified."
 
-# Format: SUBDIR|TAR_PREFIX|DOCKERFILE_NAME|IMAGE_NAME
+# Format: SUBDIR|TAR_PREFIX|DOCKERFILE_NAME|IMAGE_NAME|DEST
+# DEST: "both" copies to avocado + grafana (existing behavior).
+#       "avocado" or "grafana" copies to only that stack's directories.
 TARGETS=(
-    "debian13-base|debian13-base-latest|Dockerfile.debian13.slim|container-forge/debian13-slim"
-    "debian13-go|debian13-go-latest|Dockerfile.debian13.go|container-forge/debian13-go"
-    "debian13-node20|debian13-node20-latest|Dockerfile.debian13.node20|container-forge/debian13-node20"
-    "debian13-node22|debian13-node22-latest|Dockerfile.debian13.node22|container-forge/debian13-node22"
+    "debian13-base|debian13-base-latest|Dockerfile.debian13.slim|container-forge/debian13-slim|both"
+    "debian13-go|debian13-go-latest|Dockerfile.debian13.go|container-forge/debian13-go|both"
+    "debian13-node20|debian13-node20-latest|Dockerfile.debian13.node20|container-forge/debian13-node20|both"
+    "debian13-node22|debian13-node22-latest|Dockerfile.debian13.node22|container-forge/debian13-node22|both"
+    "debian13-postgres18|debian13-postgres18-latest|Dockerfile.debian13.postgres18|container-forge/debian13-postgres18|avocado"
 )
 
 for TARGET in "${TARGETS[@]}"; do
-    IFS="|" read -r SUBDIR TAR_PREFIX DF_NAME IMG_NAME <<< "$TARGET"
+    IFS="|" read -r SUBDIR TAR_PREFIX DF_NAME IMG_NAME DEST <<< "$TARGET"
 
     echo "========================================================="
-    echo "[$(date)] Processing target image: ${SUBDIR}"
+    echo "[$(date)] Processing target image: ${SUBDIR} (dest: ${DEST})"
     echo "========================================================="
 
     BASE_URL="${SERVER_BASE_URL}/${SUBDIR}"
@@ -133,36 +136,36 @@ for TARGET in "${TARGETS[@]}"; do
     chown ansible:ansible "$VERIFY_LOG"
     chmod 644 "$VERIFY_LOG"
 
-    cp "$VERIFY_LOG" "${GRAF_DIR}/verify-${SUBDIR}-latest.log"
-
     echo "[$(date)] Loading ${IMG_NAME}:latest into local Docker host..."
     docker load -i "$TMP_IMG"
     docker tag "${IMG_NAME}:latest" "${IMG_NAME}:protected"
 
     echo "[$(date)] Tagged ${IMG_NAME}:protected successfully."
 
-    cp "$TMP_IMG" "$IMG_DIR/"
-    cp "$TMP_IMG" "$IMG2_DIR/"
+    if [[ "$DEST" == "both" || "$DEST" == "avocado" ]]; then
+        cp "$TMP_IMG" "$IMG_DIR/"
+        cp "$TMP_TAR_SIG" "$PROV_DIR/container-forge/"
+        cp "$TMP_DIGEST_SIG" "$PROV_DIR/container-forge/"
+        cp "$TMP_DIGEST" "$PROV_DIR/container-forge/"
+        cp "$TMP_DOCKERFILE" "$DF_AVO_DIR/$DF_NAME"
+        chown -R ansible:ansible "$DF_AVO_DIR/$DF_NAME" "$IMG_DIR"
+    fi
 
-    cp "$TMP_TAR_SIG" "$PROV_DIR/container-forge/"
-    cp "$TMP_DIGEST_SIG" "$PROV_DIR/container-forge/"
-    cp "$TMP_DIGEST" "$PROV_DIR/container-forge/"
+    if [[ "$DEST" == "both" || "$DEST" == "grafana" ]]; then
+        cp "$TMP_IMG" "$IMG2_DIR/"
+        cp "$VERIFY_LOG" "${GRAF_DIR}/verify-${SUBDIR}-latest.log"
+        cp "$TMP_TAR_SIG" "$GRAF_DIR/container-forge/"
+        cp "$TMP_DIGEST_SIG" "$GRAF_DIR/container-forge/"
+        cp "$TMP_DIGEST" "$GRAF_DIR/container-forge/"
+        cp "$TMP_DOCKERFILE" "$DF_GRAF_DIR/$DF_NAME"
+        chown -R ansible:ansible "$DF_GRAF_DIR/$DF_NAME" "$IMG2_DIR"
+    fi
 
-    cp "$TMP_TAR_SIG" "$GRAF_DIR/container-forge/"
-    cp "$TMP_DIGEST_SIG" "$GRAF_DIR/container-forge/"
-    cp "$TMP_DIGEST" "$GRAF_DIR/container-forge/"
-
-    cp "$TMP_DOCKERFILE" "$DF_AVO_DIR/$DF_NAME"
-    cp "$TMP_DOCKERFILE" "$DF_GRAF_DIR/$DF_NAME"
-
-    chown -R ansible:ansible "$DF_AVO_DIR/$DF_NAME" "$DF_GRAF_DIR/$DF_NAME"
-    chown -R ansible:ansible $IMG_DIR
-    chown -R ansible:ansible $IMG2_DIR
     rm -f "$TMP_IMG" "$TMP_TAR_SIG" "$TMP_DIGEST_SIG" "$TMP_DIGEST" "$TMP_DOCKERFILE"
 
     echo "[$(date)] Successfully processed and delivered ${SUBDIR}."
 done
 
 echo "========================================================="
-echo "[$(date)] Full sync completed for debian13-base, debian13-go, debian13-node20, and debian13-node22."
+echo "[$(date)] Full sync completed for debian13-base, debian13-go, debian13-node20, debian13-node22, and debian13-postgres18."
 echo "========================================================="
