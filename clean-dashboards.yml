@@ -1,0 +1,69 @@
+---
+# tasks file for dashboard normalization pipeline
+
+- name: Strip id, version, and uid from dashboards
+  ansible.builtin.shell: |
+    jq 'del(.id, .version, .uid)' /var/lib/containers/grafana/provisioning/dashboards/{{ item }} \
+      > /var/lib/containers/grafana/provisioning/dashboards/{{ item }}.tmp && \
+    mv /var/lib/containers/grafana/provisioning/dashboards/{{ item }}.tmp /var/lib/containers/grafana/provisioning/dashboards/{{ item }}
+  args:
+    executable: /bin/bash
+  loop:
+    - nuc_linux_dashboard.json
+    - nuc_windows_dashboard.json
+    - nuc_idrac_dashboard.json
+
+- name: Normalize datasource UID variants to ds-prometheus
+  ansible.builtin.shell: |
+    for f in /var/lib/containers/grafana/provisioning/dashboards/*.json; do
+      sed -i \
+        -e 's/"uid": *"ds_prometheus"/"uid": "ds-prometheus"/g' \
+        -e 's/"uid": *"DS_PROMETHEUS"/"uid": "ds-prometheus"/g' \
+        -e 's/"uid": *"${DS_PROMETHEUS}"/"uid": "ds-prometheus"/g' \
+        -e 's/"uid": *"${ds_prometheus}"/"uid": "ds-prometheus"/g' \
+        "$f"
+    done
+  args:
+    executable: /bin/bash
+
+- name: Normalize datasource NAME to Prometheus (iDRAC only)
+  ansible.builtin.shell: |
+    for f in /var/lib/containers/grafana/provisioning/dashboards/*.json; do
+      sed -i \
+        -e 's/"name": *"DS_PROMETHEUS"/"name": "Prometheus"/g' \
+      "$f"
+    done
+  args:
+    executable: /bin/bash
+
+- name: Normalize datasource OBJECT variants to Prometheus/ds-prometheus
+  ansible.builtin.shell: |
+    for f in /var/lib/containers/grafana/provisioning/dashboards/*.json; do
+      sed -i \
+        -e 's/"datasource": *"${DS_PROMETHEUS}"/"datasource": {"type": "prometheus", "uid": "ds-prometheus"}/g' \
+        -e 's/"datasource": *"${ds_prometheus}"/"datasource": {"type": "prometheus", "uid": "ds-prometheus"}/g' \
+        "$f"
+      sed -i \
+        -e 's/"datasource": *{"uid": *"DS_PROMETHEUS"}/"datasource": {"type": "prometheus", "uid": "ds-prometheus"}/g' \
+        -e 's/"datasource": *{"uid": *"ds_prometheus"}/"datasource": {"type": "prometheus", "uid": "ds-prometheus"}/g' \
+        "$f"
+      sed -i \
+        -e 's/"datasource": *{"type": *"prometheus", *"uid": *"DS_PROMETHEUS"}/"datasource": {"type": "prometheus", "uid": "ds-prometheus"}/g' \
+        -e 's/"datasource": *{"type": *"prometheus", *"uid": *"ds_prometheus"}/"datasource": {"type": "prometheus", "uid": "ds-prometheus"}/g' \
+        "$f"
+    done
+  args:
+    executable: /bin/bash
+
+- name: Rewrite dashboard titles
+  ansible.builtin.shell: |
+    jq '.title = "{{ item.new_title }}"' \
+      /var/lib/containers/grafana/provisioning/dashboards/{{ item.file }} \
+      > /var/lib/containers/grafana/provisioning/dashboards/{{ item.file }}.tmp && \
+    mv /var/lib/containers/grafana/provisioning/dashboards/{{ item.file }}.tmp /var/lib/containers/grafana/provisioning/dashboards/{{ item.file }}
+  args:
+    executable: /bin/bash
+  loop:
+    - { file: "nuc_windows_dashboard.json", new_title: "Nucleus Windows Servers" }
+    - { file: "nuc_linux_dashboard.json", new_title: "Nucleus Linux Servers" }
+    - { file: "nuc_idrac_dashboard.json", new_title: "Nucleus IDRAC Servers" }
