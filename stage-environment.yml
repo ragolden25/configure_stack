@@ -70,6 +70,10 @@
     - { path: gpgkeys, mode: '0755', uid: 0 }
     - { path: images, mode: '0755', uid: 0 }
 
+# FIX: dropped grafana/provisioning/api/grafana_api_config.json — that
+# was staging for the v13 API-based provisioning flow (push-api-payloads.yml),
+# which this role no longer runs now that dashboards/datasources/alerting
+# go back to file-based provisioning.
 - name: Copy static configuration files
   ansible.builtin.copy:
     src: "{{ grafana_stack_artifact_dir }}/{{ item.src }}"
@@ -78,7 +82,6 @@
     group: "{{ item.owner | default('65532') }}"
     mode: '0644'
   loop:
-    - { src: 'grafana/provisioning/api/grafana_api_config.json', dest: 'grafana/provisioning/api/grafana_api_config.json' }
     - { src: 'prometheus/prometheus.yml', dest: 'prometheus/prometheus.yml' }
     - { src: 'idrac/idrac.yml', dest: 'idrac/idrac.yml', owner: '0' }
     - { src: 'nginx/nginx.conf', dest: 'nginx/nginx.conf' }
@@ -87,6 +90,11 @@
     - { src: 'nginx/ssl-dhparams.pem', dest: 'nginx/ssl-dhparams.pem' }
     - { src: 'nginx/conf.d/grafana.conf', dest: 'nginx/conf.d/grafana.conf' }
 
+# FIX: added default.yml — this is the dashboard-provisioning *provider*
+# config (tells Grafana which folder to scan for dashboard JSONs). Without
+# it, the dashboard JSONs below get copied onto disk but Grafana never
+# picks them up. pre-api-main.yml copied this; the v13/API chain dropped
+# it since dashboards were being POSTed via REST instead.
 - name: Copy loop variables for dashboards and certs
   ansible.builtin.copy:
     src: "{{ grafana_stack_artifact_dir }}/{{ item.dir }}/{{ item.file }}"
@@ -95,13 +103,19 @@
     group: '65532'
     mode: '0644'
   loop:
+    - { dir: 'grafana/provisioning/dashboards', file: 'default.yml' }
     - { dir: 'grafana/provisioning/dashboards', file: 'nuc_idrac_dashboard.json' }
     - { dir: 'grafana/provisioning/dashboards', file: 'nuc_linux_dashboard.json' }
     - { dir: 'grafana/provisioning/dashboards', file: 'nuc_windows_dashboard.json' }
     - { dir: 'nginx/certs', file: 'std1-castore.pem' }
     - { dir: 'nginx/certs', file: 'std1.key' }
 
-- name: Copy Grafana alerting configuration payloads
+# FIX: switched from the .json API-payload versions (meant for
+# push-api-payloads.yml's REST alerting import, which this role no
+# longer runs) back to the native Grafana provisioning .yml format,
+# which Grafana reads directly from provisioning/alerting/ on startup —
+# same files pre-api-main.yml staged.
+- name: Copy Grafana alerting provisioning files
   ansible.builtin.copy:
     src: "{{ grafana_stack_artifact_dir }}/grafana/provisioning/alerting/{{ item }}"
     dest: "/var/lib/containers/grafana/provisioning/alerting/{{ item }}"
@@ -109,16 +123,22 @@
     group: '65532'
     mode: '0644'
   loop:
-    - contact-points.json
-    - idrac-alerts.json
-    - linux-alerts.json
-    - notification-policies.json
-    - windows-alerts.json
+    - contact-points.yml
+    - idrac-alerts.yml
+    - linux-alerts.yml
+    - notification-policies.yml
+    - windows-alerts.yml
 
-- name: Copy Grafana Prometheus datasource configuration payload
-  ansible.builtin.copy:
-    src: "{{ grafana_stack_artifact_dir }}/grafana/provisioning/datasources/datasource.json"
-    dest: "/var/lib/containers/grafana/provisioning/datasources/datasource.json"
+# FIX: replaced the datasource.json API-payload copy (for
+# push-api-payloads.yml's REST datasource import) with the templated
+# provisioning-native version pre-api-main.yml used — Grafana reads
+# this directly from provisioning/datasources/ on startup, no API call
+# needed. Not hostname-templated per your note; std1 is the only
+# target right now.
+- name: Render Grafana Prometheus datasource (provisioning)
+  ansible.builtin.template:
+    src: "{{ grafana_stack_artifact_dir }}/grafana/provisioning/datasources/prometheus.yml.j2"
+    dest: "/var/lib/containers/grafana/provisioning/datasources/prometheus.yml"
     owner: '65532'
     group: '65532'
     mode: '0644'
