@@ -1,0 +1,61 @@
+---
+# tasks file for executing unified provisioning suite using forward-compatible v2 platform endpoints
+
+- name: Set Grafana admin password via direct localhost curl (bootstrap)
+  ansible.builtin.command: >
+    curl -X PUT -s -f -H "Content-Type: application/json" -u "admin:admin"
+    -d "{\"password\":\"{{ ansible_password }}\"}" http://localhost:3000/api/admin/users/1/password
+  register: pwd_change
+  failed_when: "pwd_change.rc != 0 and 'HTTP error' not in pwd_change.stderr"
+
+- name: Create the automated service account via localhost curl
+  ansible.builtin.command: >
+    curl -X POST -s -f -H "Content-Type: application/json" -u "admin:{{ ansible_password }}"
+    -d "{\"name\":\"grafana-unified\",\"role\":\"Admin\"}" http://localhost:3000/api/serviceaccounts
+  register: sa_create
+  failed_when: "sa_create.rc != 0 and 'already exists' not in sa_create.stdout"
+
+- name: Create API token for the service account via localhost curl
+  ansible.builtin.command: >
+    curl -X POST -s -f -H "Content-Type: application/json" -u "admin:{{ ansible_password }}"
+    -d "{\"name\":\"grafana-unified-token\"}" http://localhost:3000/api/serviceaccounts/{{ (sa_create.stdout | from_json).id }}/tokens
+  register: token_create
+  failed_when: "token_create.rc != 0 and 'already exists' not in token_create.stdout"
+
+- name: Extract generated service account token key into an active fact
+  ansible.builtin.set_fact:
+    active_token: "{{ (token_create.stdout | from_json).key }}"
+  when: token_create.rc == 0
+
+- name: Import Grafana Prometheus datasource via direct REST injection (Locked UID)
+  ansible.builtin.shell: >
+    curl -X POST -s -f -u "admin:{{ ansible_password }}" -H "Content-Type: application/json"
+    -d "{\"name\":\"Prometheus\",\"type\":\"prometheus\",\"url\":\"http://prometheus:9191\",\"access\":\"proxy\",\"uid\":\"ds-prometheus\",\"isDefault\":true,\"jsonData\":{\"httpMethod\":\"POST\"}}"
+    http://localhost:3000/api/datasources
+  args:
+    executable: /bin/bash
+  register: ds_import
+  failed_when: "ds_import.rc != 0 and 'name already exists' not in ds_import.stdout"
+
+- name: Import dashboards into Grafana unified storage via target python stream (v2 forward-compatible)
+  ansible.builtin.shell: |
+    python3 -c '
+    import json, urllib.request
+    with open("/var/lib/containers/grafana/provisioning/dashboards/{{ item.file }}", "r") as f:
+        spec_data = json.load(f)
+    payload = {"metadata": {"name": "{{ item.name }}"}, "spec": spec_data}
+    req = urllib.request.Request(
+        "http://localhost:3000/apis/dashboard.grafana.app/v2/namespaces/default/dashboards",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": "Bearer {{ active_token }}", "Content-Type": "application/json"},
+        method="POST"
+    )
+    with urllib.request.urlopen(req) as res:
+        print(res.read().decode())
+    '
+  args:
+    executable: /bin/bash
+  loop:
+    - { name: 'linux-dashboard', file: 'nuc_linux_dashboard.json' }
+    - { name: 'windows-dashboard', file: 'nuc_windows_dashboard.json' }
+    - { name: 'idrac-dashboard', file: 'nuc_idrac_dashboard.json' }
