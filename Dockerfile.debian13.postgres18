@@ -1,0 +1,48 @@
+# Dockerfile.debian13.postgres18
+FROM container-forge/debian13-slim:latest
+
+LABEL org.opencontainers.image.title="container-forge debian13-postgres18"
+LABEL org.opencontainers.image.description="Debian 13 Slim base with full toolchain for building PostgreSQL 18.x from source"
+LABEL org.opencontainers.image.vendor="containerforge"
+LABEL org.opencontainers.image.version="latest"
+LABEL org.opencontainers.image.source="mmdebstrap.sh"
+LABEL org.opencontainers.image.base.name="debian13-slim"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        pkg-config \
+        bison \
+        flex \
+        perl \
+        wget \
+        ca-certificates \
+        libkrb5-dev \
+        libicu-dev \
+        libldap2-dev \
+        libcurl4-openssl-dev \
+        libnuma-dev \
+        liburing-dev \
+        libxml2-dev \
+        libxslt1-dev \
+        llvm-dev \
+        clang \
+        liblz4-dev \
+        libpam0g-dev \
+        libselinux1-dev \
+        libssl-dev \
+        uuid-dev \
+        e2fsprogs \
+        libzstd-dev \
+        libreadline-dev \
+        tzdata \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD gcc --version && bison --version && flex --version || exit 1
+
+CMD ["/bin/bash"]
