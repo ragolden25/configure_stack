@@ -6,7 +6,7 @@ set -euo pipefail
 # Modular image builds
 
 LOG="/root/bin/daily-build.log"
-IMAGES="${IMAGES:-base go node20 node22}"
+IMAGES="${IMAGES:-base go node20 node22 postgres18}"
 
 echo "=== $(date -Iseconds) : Starting daily build ===" >> "$LOG"
 
