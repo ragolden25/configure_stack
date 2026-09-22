@@ -1,0 +1,24 @@
+---
+# Generate README.md from template
+
+- name: Render README.md from template
+  ansible.builtin.template:
+    src: README.md.j2
+    dest: "/opt/ansible/nucleus/roles/configure_grafana_stack/README.md"
+  delegate_to: localhost
+
+# Determine correct group based on which controller is running the playbook
+- name: Determine correct group for README ownership
+  ansible.builtin.set_fact:
+    readme_group: >-
+      {{ 'ansible-admin' if ansible_hostname == 'ansible' else 'ansible' }}
+  delegate_to: localhost
+
+# Apply correct ownership
+- name: Set correct ownership on generated README.md
+  ansible.builtin.file:
+    path: "/opt/ansible/nucleus/roles/configure_grafana_stack/README.md"
+    owner: ansible
+    group: "{{ readme_group }}"
+    mode: '0644'
+  delegate_to: localhost
