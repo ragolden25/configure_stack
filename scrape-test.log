@@ -1,0 +1,200 @@
+[root@std1 compose]# curl -s http://127.0.0.1:9191/api/v1/targets | python3 -m json.tool
+{
+    "status": "success",
+    "data": {
+        "activeTargets": [
+            {
+                "discoveredLabels": {
+                    "__address__": "192.168.110.20:9182",
+                    "__always_scrape_classic_histograms__": "false",
+                    "__convert_classic_histograms_to_nhcb__": "false",
+                    "__metrics_path__": "/metrics",
+                    "__scheme__": "http",
+                    "__scrape_interval__": "15s",
+                    "__scrape_native_histograms__": "false",
+                    "__scrape_timeout__": "10s",
+                    "job": "ap01"
+                },
+                "labels": {
+                    "instance": "192.168.110.20:9182",
+                    "job": "ap01"
+                },
+                "scrapePool": "ap01",
+                "scrapeUrl": "http://192.168.110.20:9182/metrics",
+                "globalUrl": "http://192.168.110.20:9182/metrics",
+                "lastError": "Get \"http://192.168.110.20:9182/metrics\": dial tcp 192.168.110.20:9182: connect: no route to host",
+                "lastScrape": "2026-09-22T18:51:12.25257699Z",
+                "lastScrapeDuration": 3.055255108,
+                "health": "down",
+                "scrapeInterval": "15s",
+                "scrapeTimeout": "10s"
+            },
+            {
+                "discoveredLabels": {
+                    "__address__": "192.168.110.11",
+                    "__always_scrape_classic_histograms__": "false",
+                    "__convert_classic_histograms_to_nhcb__": "false",
+                    "__metrics_path__": "/metrics",
+                    "__scheme__": "http",
+                    "__scrape_interval__": "15s",
+                    "__scrape_native_histograms__": "false",
+                    "__scrape_timeout__": "10s",
+                    "job": "idrac"
+                },
+                "labels": {
+                    "instance": "192.168.110.11",
+                    "job": "idrac"
+                },
+                "scrapePool": "idrac",
+                "scrapeUrl": "http://idrac_exporter:9348/metrics?target=192.168.110.11",
+                "globalUrl": "http://idrac_exporter:9348/metrics?target=192.168.110.11",
+                "lastError": "",
+                "lastScrape": "2026-09-22T18:51:06.680221245Z",
+                "lastScrapeDuration": 2.60045852,
+                "health": "up",
+                "scrapeInterval": "15s",
+                "scrapeTimeout": "10s"
+            },
+            {
+                "discoveredLabels": {
+                    "__address__": "192.168.110.32:9100",
+                    "__always_scrape_classic_histograms__": "false",
+                    "__convert_classic_histograms_to_nhcb__": "false",
+                    "__metrics_path__": "/metrics",
+                    "__scheme__": "http",
+                    "__scrape_interval__": "15s",
+                    "__scrape_native_histograms__": "false",
+                    "__scrape_timeout__": "10s",
+                    "job": "nessus"
+                },
+                "labels": {
+                    "instance": "192.168.110.32:9100",
+                    "job": "nessus"
+                },
+                "scrapePool": "nessus",
+                "scrapeUrl": "http://192.168.110.32:9100/metrics",
+                "globalUrl": "http://192.168.110.32:9100/metrics",
+                "lastError": "Get \"http://192.168.110.32:9100/metrics\": dial tcp 192.168.110.32:9100: connect: no route to host",
+                "lastScrape": "2026-09-22T18:51:01.32612203Z",
+                "lastScrapeDuration": 3.100880028,
+                "health": "down",
+                "scrapeInterval": "15s",
+                "scrapeTimeout": "10s"
+            },
+            {
+                "discoveredLabels": {
+                    "__address__": "192.168.110.31:9100",
+                    "__always_scrape_classic_histograms__": "false",
+                    "__convert_classic_histograms_to_nhcb__": "false",
+                    "__metrics_path__": "/metrics",
+                    "__scheme__": "http",
+                    "__scrape_interval__": "15s",
+                    "__scrape_native_histograms__": "false",
+                    "__scrape_timeout__": "10s",
+                    "job": "nifi"
+                },
+                "labels": {
+                    "instance": "192.168.110.31:9100",
+                    "job": "nifi"
+                },
+                "scrapePool": "nifi",
+                "scrapeUrl": "http://192.168.110.31:9100/metrics",
+                "globalUrl": "http://192.168.110.31:9100/metrics",
+                "lastError": "Get \"http://192.168.110.31:9100/metrics\": dial tcp 192.168.110.31:9100: connect: no route to host",
+                "lastScrape": "2026-09-22T18:51:11.503595127Z",
+                "lastScrapeDuration": 3.100295721,
+                "health": "down",
+                "scrapeInterval": "15s",
+                "scrapeTimeout": "10s"
+            },
+            {
+                "discoveredLabels": {
+                    "__address__": "192.168.110.82:9100",
+                    "__always_scrape_classic_histograms__": "false",
+                    "__convert_classic_histograms_to_nhcb__": "false",
+                    "__metrics_path__": "/metrics",
+                    "__scheme__": "http",
+                    "__scrape_interval__": "15s",
+                    "__scrape_native_histograms__": "false",
+                    "__scrape_timeout__": "10s",
+                    "job": "redfalcon"
+                },
+                "labels": {
+                    "instance": "192.168.110.82:9100",
+                    "job": "redfalcon"
+                },
+                "scrapePool": "redfalcon",
+                "scrapeUrl": "http://192.168.110.82:9100/metrics",
+                "globalUrl": "http://192.168.110.82:9100/metrics",
+                "lastError": "Get \"http://192.168.110.82:9100/metrics\": dial tcp 192.168.110.82:9100: connect: no route to host",
+                "lastScrape": "2026-09-22T18:51:06.090763413Z",
+                "lastScrapeDuration": 0.001766794,
+                "health": "down",
+                "scrapeInterval": "15s",
+                "scrapeTimeout": "10s"
+            },
+            {
+                "discoveredLabels": {
+                    "__address__": "192.168.110.30:9100",
+                    "__always_scrape_classic_histograms__": "false",
+                    "__convert_classic_histograms_to_nhcb__": "false",
+                    "__metrics_path__": "/metrics",
+                    "__scheme__": "http",
+                    "__scrape_interval__": "15s",
+                    "__scrape_native_histograms__": "false",
+                    "__scrape_timeout__": "10s",
+                    "job": "repo"
+                },
+                "labels": {
+                    "instance": "192.168.110.30:9100",
+                    "job": "repo"
+                },
+                "scrapePool": "repo",
+                "scrapeUrl": "http://192.168.110.30:9100/metrics",
+                "globalUrl": "http://192.168.110.30:9100/metrics",
+                "lastError": "Get \"http://192.168.110.30:9100/metrics\": dial tcp 192.168.110.30:9100: connect: no route to host",
+                "lastScrape": "2026-09-22T18:51:01.479470977Z",
+                "lastScrapeDuration": 3.075679765,
+                "health": "down",
+                "scrapeInterval": "15s",
+                "scrapeTimeout": "10s"
+            },
+            {
+                "discoveredLabels": {
+                    "__address__": "192.168.110.39:9100",
+                    "__always_scrape_classic_histograms__": "false",
+                    "__convert_classic_histograms_to_nhcb__": "false",
+                    "__metrics_path__": "/metrics",
+                    "__scheme__": "http",
+                    "__scrape_interval__": "5s",
+                    "__scrape_native_histograms__": "false",
+                    "__scrape_timeout__": "5s",
+                    "job": "std1"
+                },
+                "labels": {
+                    "instance": "192.168.110.39:9100",
+                    "job": "std1"
+                },
+                "scrapePool": "std1",
+                "scrapeUrl": "http://192.168.110.39:9100/metrics",
+                "globalUrl": "http://192.168.110.39:9100/metrics",
+                "lastError": "Get \"http://192.168.110.39:9100/metrics\": dial tcp 192.168.110.39:9100: connect: no route to host",
+                "lastScrape": "2026-09-22T18:51:14.360467428Z",
+                "lastScrapeDuration": 0.001301052,
+                "health": "down",
+                "scrapeInterval": "5s",
+                "scrapeTimeout": "5s"
+            }
+        ],
+        "droppedTargets": [],
+        "droppedTargetCounts": {
+            "ap01": 0,
+            "idrac": 0,
+            "nessus": 0,
+            "nifi": 0,
+            "redfalcon": 0,
+            "repo": 0,
+            "std1": 0
+        }
+    }
+}
