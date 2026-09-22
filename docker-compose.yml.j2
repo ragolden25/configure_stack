@@ -1,4 +1,3 @@
-docker-compose.yml.j2
 networks:
   grafana_net:
     name: grafana_net
@@ -26,7 +25,16 @@ services:
     volumes:
       # Explicit configuration file mount
       - "/var/lib/containers/grafana/config/grafana.ini:/etc/grafana/grafana.ini:ro"
-      - "/var/lib/containers/grafana/provisioning/api:/etc/grafana/provisioning/api:ro"
+
+      # FIX: was four separate mounts (one per provisioning subdirectory,
+      # plus provisioning/api left over from the API approach). Classic
+      # Grafana provisioning doesn't need that — point GF_PATHS_PROVISIONING
+      # at one directory and Grafana walks the whole tree itself
+      # (datasources/, dashboards/, alerting/, plugins/, access-control/).
+      # One mount for the whole provisioning/ tree does the same job with
+      # less to keep in sync: add a new provisioning subdirectory later
+      # and it's picked up automatically, no compose edit required.
+      - "/var/lib/containers/grafana/provisioning:/etc/grafana/provisioning:ro"
 
       # Explicit unified storage mount (Houses the backend SQLite database for API objects)
       - "/var/lib/containers/grafana/data:/usr/share/grafana/data:rw"
