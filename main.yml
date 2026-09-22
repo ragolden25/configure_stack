@@ -1,0 +1,44 @@
+---
+# tasks file for configure_grafana_stack
+# Grafana version 13 draft
+
+# ───────────────────────────────────────────────
+# Phase 1: Environment & File Prep
+# ───────────────────────────────────────────────
+- name: Execute environmental bootstrap and file staging
+  ansible.builtin.include_tasks: stage-environment.yml
+
+# ───────────────────────────────────────────────
+# Phase 2: Operations & Optimization
+# ───────────────────────────────────────────────
+- name: Run dashboard regex formatting and cleaning tasks
+  ansible.builtin.include_tasks: clean-dashboards.yml
+
+- name: Fix final post-cleanup file bounds
+  ansible.builtin.file:
+    path: "/var/lib/containers/grafana/provisioning/dashboards/{{ item }}"
+    mode: '0644'
+    owner: '65532'
+    group: '65532'
+  loop:
+    - nuc_idrac_dashboard.json
+    - nuc_linux_dashboard.json
+    - nuc_windows_dashboard.json
+
+- name: Run standard orchestration environment stack scripts
+  ansible.builtin.command: /var/lib/containers/compose/run.sh
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+# ───────────────────────────────────────────────
+# Phase 3: Unified Storage Injection Suite
+# ───────────────────────────────────────────────
+- name: Execute Unified API provisioning stack
+  ansible.builtin.include_tasks: push-api-payloads.yml
+
+# ───────────────────────────────────────────────
+# README Generation
+# ───────────────────────────────────────────────
+- name: Generate README from template
+  ansible.builtin.include_tasks: generate-readme.yml
+  run_once: true
