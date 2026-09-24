@@ -1,5 +1,18 @@
-Dockerfile.guacamole.hardened
-FROM container-forge/debian13-slim:latest
+# ------------------------------------------------------------
+# Hardened Guacamole (Tomcat + JRE + guacamole.war) runtime image
+# Grafana/postgres-pattern: slim baseline -> staged artifacts -> rootfs -> strip -> scratch
+#
+# NOTE: catalina.sh (Tomcat's startup script) requires a POSIX shell and a
+# handful of coreutils to assemble the classpath and JVM options. Unlike
+# postgres's single-binary ENTRYPOINT, this cannot go fully shell-free
+# without rewriting Tomcat's startup to invoke java directly and bypass
+# catalina.sh -- DHI itself keeps catalina.sh for the same reason. This
+# Dockerfile deliberately retains /bin/sh and the coreutils catalina.sh
+# needs; everything else follows the same builder/rootfs-export/scratch
+# shape as the postgres hardened image.
+# ------------------------------------------------------------
+
+FROM container-forge/debian13-slim:latest AS builder
 
 ARG TOMCAT_VERSION=9.0.118
 ARG JDK_VERSION=21.0.11.10
@@ -79,21 +92,51 @@ RUN mkdir -p \
       /var/lib/tomcat \
       /output
 
-# --- HARDEN RUNTIME LAYER ---
-RUN rm -f /usr/bin/apt /usr/bin/apt-get /usr/bin/apt-cache /usr/bin/dpkg && \
-    rm -f /usr/bin/curl /usr/bin/wget /usr/bin/ftp || true && \
-    rm -f /usr/bin/python* /usr/bin/perl || true && \
-    rm -f /usr/bin/strace /usr/bin/lsof /usr/bin/nc /usr/bin/telnet || true && \
-    rm -f /usr/bin/vi /usr/bin/nano /usr/bin/less || true && \
-    rm -f /usr/bin/awk /usr/bin/sed /usr/bin/grep || true && \
-    rm -f /usr/bin/chage /usr/bin/chfn /usr/bin/chsh /usr/bin/passwd /usr/bin/newgrp /usr/bin/gpasswd || true && \
-    rm -f /bin/bash || true && \
-    rm -rf /var/lib/apt /var/cache/apt /var/lib/dpkg || true && \
-    rm -rf /usr/share/man /usr/share/doc || true && \
-    rm -f /usr/sbin/useradd /usr/sbin/groupadd /usr/sbin/adduser /usr/sbin/addgroup || true
+# Build rootfs BEFORE stripping (Grafana/postgres pattern)
+RUN mkdir /rootfs && \
+    cp -a /bin /rootfs/bin && \
+    cp -a /lib /rootfs/lib && \
+    cp -a /lib64 /rootfs/lib64 && \
+    cp -a /usr /rootfs/usr && \
+    cp -a /etc /rootfs/etc && \
+    cp -a /var /rootfs/var && \
+    cp -a /opt /rootfs/opt
+
+# Strip inside rootfs -- hardening only. Same removal list as before;
+# deliberately does NOT touch /bin/sh, awk-free coreutils, or anything
+# catalina.sh needs to assemble the classpath and start the JVM.
+RUN rm -f /rootfs/usr/bin/apt /rootfs/usr/bin/apt-get /rootfs/usr/bin/apt-cache /rootfs/usr/bin/dpkg && \
+    rm -f /rootfs/usr/bin/curl /rootfs/usr/bin/wget /rootfs/usr/bin/ftp || true && \
+    rm -f /rootfs/usr/bin/python* /rootfs/usr/bin/perl || true && \
+    rm -f /rootfs/usr/bin/strace /rootfs/usr/bin/lsof /rootfs/usr/bin/nc /rootfs/usr/bin/telnet || true && \
+    rm -f /rootfs/usr/bin/vi /rootfs/usr/bin/nano /rootfs/usr/bin/less || true && \
+    rm -f /rootfs/usr/bin/awk /rootfs/usr/bin/sed /rootfs/usr/bin/grep || true && \
+    rm -f /rootfs/usr/bin/chage /rootfs/usr/bin/chfn /rootfs/usr/bin/chsh /rootfs/usr/bin/passwd /rootfs/usr/bin/newgrp /rootfs/usr/bin/gpasswd || true && \
+    rm -f /rootfs/bin/bash || true && \
+    rm -rf /rootfs/var/lib/apt /rootfs/var/cache/apt /rootfs/var/lib/dpkg || true && \
+    rm -rf /rootfs/usr/share/man /rootfs/usr/share/doc || true && \
+    rm -f /rootfs/usr/sbin/useradd /rootfs/usr/sbin/groupadd /rootfs/usr/sbin/adduser /rootfs/usr/sbin/addgroup || true
+
+FROM scratch
+
+ARG TOMCAT_VERSION=9.0.118
+ARG JDK_VERSION=21.0.11.10
+ARG GUAC_VERSION=1.6.0
+
+LABEL org.opencontainers.image.title="guacamole-hardened" \
+      org.opencontainers.image.version="${GUAC_VERSION}" \
+      org.opencontainers.image.description="Hardened Guacamole (Tomcat ${TOMCAT_VERSION} + JRE ${JDK_VERSION}) runtime image" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+ENV JAVA_HOME=/opt/jre
+ENV CATALINA_HOME=/usr/local/tomcat
+ENV PATH="${PATH}:${JAVA_HOME}/bin"
+
+COPY --from=builder /rootfs/ /
 
 USER tomcat
 WORKDIR ${CATALINA_HOME}
 
 EXPOSE 8080
+
 CMD ["bin/catalina.sh", "run"]
