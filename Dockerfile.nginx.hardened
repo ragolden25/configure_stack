@@ -1,0 +1,73 @@
+Dockerfile.nginx.hardened
+FROM container-forge/debian13-slim:latest AS builder
+
+ARG NGINX_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install nginx + TLS deps from your nucleus repo
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        tzdata \
+        libc6 \
+        libstdc++6 \
+        openssl \
+        libssl3 \
+        nginx && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /etc/nginx /var/log/nginx /usr/share/nginx/html /usr/sbin
+RUN chmod 0755 /usr/sbin/nginx
+
+# Build rootfs BEFORE stripping
+RUN mkdir /rootfs && \
+    cp -a /bin /rootfs/bin && \
+    cp -a /lib /rootfs/lib && \
+    cp -a /lib64 /rootfs/lib64 && \
+    cp -a /usr /rootfs/usr && \
+    cp -a /etc /rootfs/etc && \
+    cp -a /var /rootfs/var
+
+# Strip inside rootfs — hardening only
+RUN rm -rf \
+    /rootfs/var/lib/apt \
+    /rootfs/var/cache/apt \
+    /rootfs/var/lib/dpkg \
+    /rootfs/usr/share/doc \
+    /rootfs/usr/share/man \
+    /rootfs/bin/sh \
+    /rootfs/bin/bash \
+    /rootfs/bin/dash \
+    /rootfs/usr/bin/apt* \
+    /rootfs/usr/bin/dpkg* \
+    /rootfs/usr/bin/lsblk \
+    /rootfs/usr/bin/fdisk \
+    /rootfs/usr/bin/mount \
+    /rootfs/usr/bin/umount \
+    /rootfs/usr/bin/passwd \
+    /rootfs/usr/bin/chage \
+    /rootfs/usr/sbin/useradd \
+    /rootfs/usr/sbin/usermod \
+    /rootfs/bin/gzip \
+    /rootfs/usr/bin/gzip \
+    /rootfs/bin/xz \
+    /rootfs/usr/bin/xz
+
+FROM scratch
+
+ARG NGINX_VERSION
+
+LABEL org.opencontainers.image.title="nginx-hardened" \
+      org.opencontainers.image.version="${NGINX_VERSION}" \
+      org.opencontainers.image.description="Hardened nginx runtime image on custom distroless" \
+      org.opencontainers.image.licenses="BSD-2-Clause"
+
+COPY --from=builder /rootfs/ /
+
+USER 65532:65532
+WORKDIR /usr/share/nginx/html
+
+EXPOSE 80 443
+
+ENTRYPOINT ["/usr/sbin/nginx"]
+CMD ["-g", "daemon off;"]
