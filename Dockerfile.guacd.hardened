@@ -1,0 +1,230 @@
+###############################
+# Stage 1: Base resolver
+###############################
+
+FROM container-forge/debian13-slim:latest AS resolver-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+###############################
+# Stage 2: FreeRDP builder (required for Debian 13)
+###############################
+
+FROM resolver-base AS freerdp-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    libssl-dev \
+    libxkbcommon-dev \
+    libwayland-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libavcodec-dev \
+    libavutil-dev \
+    libavformat-dev \
+    libswscale-dev \
+    libkrb5-dev \
+    krb5-multidev \
+    libjson-c-dev \
+    libjansson-dev \
+    libcjson-dev \
+    liburiparser-dev \
+    libsystemd-dev \
+    libicu-dev \
+    libusb-1.0-0-dev \
+    libfuse3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp/freerdp
+
+COPY sources/freerdp-3.6.0.tar.gz ./
+RUN tar xf freerdp-3.6.0.tar.gz --strip-components=1 && \
+    mkdir build && cd build && \
+    cmake -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DWITH_SERVER=OFF \
+      -DWITH_CLIENT=OFF \
+      -DWITH_X11=OFF \
+      -DWITH_WAYLAND=OFF \
+      -DWITH_GSTREAMER=OFF \
+      -DWITH_CUPS=OFF \
+      -DWITH_SMARTCARD=OFF \
+      -DWITH_PULSE=OFF \
+      -DWITH_ALSA=OFF \
+      -DWITH_CODEC=OFF \
+      -DWITH_CHANNELS=ON \
+      -DWITH_OPENSSL=ON \
+      -DWITH_VAAPI_H264_ENCODING=OFF \
+      .. && \
+    ninja && ninja install
+
+###############################
+# Stage 3: guacd builder (1.6.0)
+###############################
+
+FROM resolver-base AS guacd-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    libcairo2-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libwebp-dev \
+    libavcodec-dev \
+    libavutil-dev \
+    libavformat-dev \
+    libswscale-dev \
+    libpango1.0-dev \
+    libpulse-dev \
+    libvorbis-dev \
+    uuid-dev \
+    \
+    # Option A: Debian dev packages for SSH/VNC/WebSockets
+    libssh2-1-dev \
+    libssl-dev \
+    libvncserver-dev \
+    libwebsockets-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Bring in FreeRDP from source build
+COPY --from=freerdp-builder /usr/local /usr/local
+
+WORKDIR /tmp/guacd
+
+COPY guacamole-server-1.6.0.tar.gz ./
+
+RUN tar xf guacamole-server-1.6.0.tar.gz --strip-components=1 && \
+    autoreconf -fi && \
+    PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH \
+    ./configure \
+        --prefix=/usr/local \
+        --disable-guaclog \
+        --disable-guacenc \
+        --enable-ssh \
+        --enable-rdp \
+        --enable-vnc \
+    && make -j"$(nproc)" && \
+    make install && \
+    ldconfig
+
+###############################
+# Stage 4: Hardened runtime base
+###############################
+
+FROM resolver-base AS runtime-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcairo2 \
+    libjpeg62-turbo \
+    libpng16-16 \
+    libwebp7 \
+    libavcodec61 \
+    libavutil59 \
+    libavformat61 \
+    libswscale8 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libpulse0 \
+    libvorbis0a \
+    libuuid1 \
+    libssl3 \
+    libkrb5-3 \
+    libjson-c5 \
+    libjansson4 \
+    libcjson1 \
+    liburiparser1 \
+    libsystemd0 \
+    libicu76 \
+    libusb-1.0-0 \
+    libfuse3-4 \
+    libssh2-1 \
+    libvncserver1 \
+    libwebsockets19 \
+    fontconfig \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+# Remove inherited forge user (UID 1000) if present
+RUN if getent passwd 1000 >/dev/null; then \
+        userdel -r "$(getent passwd 1000 | cut -d: -f1)" || true; \
+    fi && \
+    if getent group 1000 >/dev/null; then \
+        groupdel 1000 || true; \
+    fi
+
+###############################
+# Stage 5: Assembly (combine runtime libs + guacd/FreeRDP, then
+# build a rootfs mirror for the scratch export)
+###############################
+
+FROM runtime-base AS assembly
+
+# Bring in guacd + FreeRDP protocol plugins
+COPY --from=guacd-builder /usr/local /usr/local
+
+RUN ldconfig
+
+# Build rootfs BEFORE stripping (Grafana/postgres pattern)
+RUN mkdir /rootfs && \
+    cp -a /bin /rootfs/bin && \
+    cp -a /lib /rootfs/lib && \
+    cp -a /lib64 /rootfs/lib64 && \
+    cp -a /usr /rootfs/usr && \
+    cp -a /etc /rootfs/etc && \
+    cp -a /var /rootfs/var
+
+# FINAL HARDENING SWEEP -- same list as your existing hardened
+# Dockerfile, retargeted at /rootfs so it actually ships this time
+# (previously this ran against runtime-base's own filesystem, but
+# the old final stage rebuilt FROM resolver-base fresh and only
+# copied /usr/lib and /lib from runtime-base -- so none of this
+# ever made it into the shipped image). guacd's ENTRYPOINT/CMD are
+# exec-form and invoke the compiled daemon directly, so this can go
+# fully shell-free.
+RUN rm -f /rootfs/usr/bin/apt /rootfs/usr/bin/apt-get /rootfs/usr/bin/dpkg \
+       /rootfs/usr/bin/apt-cache /rootfs/usr/bin/apt-config /rootfs/usr/bin/update-alternatives \
+       /rootfs/bin/sh /rootfs/bin/bash /rootfs/usr/bin/zsh /rootfs/usr/bin/fish \
+       && rm -f /rootfs/usr/bin/chage /rootfs/usr/bin/passwd /rootfs/usr/sbin/usermod /rootfs/usr/sbin/useradd /rootfs/usr/bin/newgrp /rootfs/usr/bin/gpasswd \
+       && rm -rf /rootfs/usr/share/man /rootfs/usr/share/doc /rootfs/usr/share/locale \
+       && rm -rf /rootfs/var/lib/apt /rootfs/var/cache/apt /rootfs/var/lib/dpkg \
+       && rm -f /rootfs/usr/bin/wget /rootfs/usr/bin/curl /rootfs/usr/bin/less /rootfs/usr/bin/nano \
+       && rm -f /rootfs/usr/bin/vim /rootfs/usr/bin/vi \
+       && rm -f /rootfs/usr/sbin/useradd /rootfs/usr/sbin/groupadd /rootfs/usr/sbin/adduser /rootfs/usr/sbin/addgroup
+
+###############################
+# Stage 6: FINAL HARDENED IMAGE (shell-free, scratch export)
+###############################
+
+FROM scratch
+
+LABEL org.opencontainers.image.title="guacd-hardened" \
+      org.opencontainers.image.version="1.6.0" \
+      org.opencontainers.image.description="Hardened guacd (Guacamole proxy daemon) runtime image with FreeRDP 3.6.0" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+ENV LD_LIBRARY_PATH="/usr/local/lib"
+
+COPY --from=assembly /rootfs/ /
+
+EXPOSE 4822
+
+ENTRYPOINT ["/usr/local/sbin/guacd"]
+CMD ["-f", "-b", "0.0.0.0"]
