@@ -1,0 +1,99 @@
+Dockerfile.guacamole.hardened
+FROM container-forge/debian13-slim:latest
+
+ARG TOMCAT_VERSION=9.0.118
+ARG JDK_VERSION=21.0.11.10
+ARG GUAC_VERSION=1.6.0
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV JAVA_HOME=/opt/jre
+ENV CATALINA_HOME=/usr/local/tomcat
+ENV PATH="${PATH}:${JAVA_HOME}/bin"
+
+# Minimal runtime packages only
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        fontconfig \
+        libfreetype6 \
+        libpng16-16 \
+        libjpeg62-turbo \
+        procps && \
+    rm -rf /var/lib/apt/lists/*
+
+# Remove inherited forge user (UID 1000) if present
+RUN if getent passwd 1000 >/dev/null; then \
+        userdel -r "$(getent passwd 1000 | cut -d: -f1)" || true; \
+    fi && \
+    if getent group 1000 >/dev/null; then \
+        groupdel 1000 || true; \
+    fi
+
+# Create non-root tomcat user
+RUN useradd -r -u 65532 -d ${CATALINA_HOME} -s /usr/sbin/nologin tomcat
+
+# Install JRE
+COPY src/openjdk/${JDK_VERSION}/OpenJDK21U-jre_x64_linux_hotspot_21.0.11_10.tar.gz /tmp/jre.tar.gz
+RUN mkdir -p /opt/jre && \
+    tar -xzf /tmp/jre.tar.gz --strip-components=1 -C /opt/jre && \
+    rm -f /tmp/jre.tar.gz
+
+# Install Tomcat
+COPY src/tomcat/${TOMCAT_VERSION}/tomcat-${TOMCAT_VERSION}.tar.gz /tmp/tomcat.tar.gz
+RUN mkdir -p /usr/local && \
+    tar -xzf /tmp/tomcat.tar.gz -C /usr/local && \
+    mv /usr/local/apache-tomcat-${TOMCAT_VERSION} ${CATALINA_HOME} && \
+    rm -f /tmp/tomcat.tar.gz
+
+# Guacamole deployment directories
+RUN mkdir -p ${CATALINA_HOME}/.guacamole/extensions \
+             ${CATALINA_HOME}/.guacamole/lib
+
+# Ensure .guacamole exists and is owned by tomcat
+RUN mkdir -p /usr/local/tomcat/.guacamole && \
+    chown -R tomcat:tomcat /usr/local/tomcat/.guacamole && \
+    chmod 0755 /usr/local/tomcat/.guacamole
+
+# WAR lives in quarterly root
+COPY guacamole-${GUAC_VERSION}.war ${CATALINA_HOME}/webapps/guacamole.war
+
+# JARs live in lib/ at quarterly root
+COPY lib/*.jar ${CATALINA_HOME}/.guacamole/lib/
+# Optional extensions:
+# COPY extensions/*.jar ${CATALINA_HOME}/.guacamole/extensions/
+
+# guacamole.properties
+COPY 1.6.0/guacamole.properties /usr/local/tomcat/.guacamole/
+RUN chown tomcat:tomcat /usr/local/tomcat/.guacamole/guacamole.properties && \
+    chmod 0644 /usr/local/tomcat/.guacamole/guacamole.properties
+
+# SELinux-safe writable directories
+RUN mkdir -p \
+      ${CATALINA_HOME}/temp \
+      ${CATALINA_HOME}/logs \
+      ${CATALINA_HOME}/work \
+      /var/lib/tomcat \
+      /output && \
+    chown -R tomcat:tomcat \
+      ${CATALINA_HOME} \
+      /var/lib/tomcat \
+      /output
+
+# --- HARDEN RUNTIME LAYER ---
+RUN rm -f /usr/bin/apt /usr/bin/apt-get /usr/bin/apt-cache /usr/bin/dpkg && \
+    rm -f /usr/bin/curl /usr/bin/wget /usr/bin/ftp || true && \
+    rm -f /usr/bin/python* /usr/bin/perl || true && \
+    rm -f /usr/bin/strace /usr/bin/lsof /usr/bin/nc /usr/bin/telnet || true && \
+    rm -f /usr/bin/vi /usr/bin/nano /usr/bin/less || true && \
+    rm -f /usr/bin/awk /usr/bin/sed /usr/bin/grep || true && \
+    rm -f /usr/bin/chage /usr/bin/chfn /usr/bin/chsh /usr/bin/passwd /usr/bin/newgrp /usr/bin/gpasswd || true && \
+    rm -f /bin/bash || true && \
+    rm -rf /var/lib/apt /var/cache/apt /var/lib/dpkg || true && \
+    rm -rf /usr/share/man /usr/share/doc || true && \
+    rm -f /usr/sbin/useradd /usr/sbin/groupadd /usr/sbin/adduser /usr/sbin/addgroup || true
+
+USER tomcat
+WORKDIR ${CATALINA_HOME}
+
+EXPOSE 8080
+CMD ["bin/catalina.sh", "run"]
