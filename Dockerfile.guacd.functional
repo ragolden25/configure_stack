@@ -1,0 +1,200 @@
+###############################
+# Stage 1: Base resolver
+###############################
+
+FROM container-forge/debian13-slim:latest AS resolver-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    apt-file \
+    apt-utils \
+    gnupg \
+    && apt-file update \
+    && rm -rf /var/lib/apt/lists/*
+
+###############################
+# Stage 2: FreeRDP builder (3.6.0)
+###############################
+
+FROM resolver-base AS freerdp-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    ca-certificates \
+    libssl-dev \
+    libxkbcommon-dev \
+    libwayland-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libavcodec-dev \
+    libavutil-dev \
+    libavformat-dev \
+    libswscale-dev \
+    libkrb5-dev \
+    krb5-multidev \
+    libjson-c-dev \
+    libjansson-dev \
+    libcjson-dev \
+    liburiparser-dev \
+    libsystemd-dev \
+    libicu-dev \
+    libusb-1.0-0-dev \
+    libfuse3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp/freerdp
+
+COPY sources/freerdp-3.6.0.tar.gz ./
+RUN tar xf freerdp-3.6.0.tar.gz --strip-components=1 && \
+    mkdir build && cd build && \
+    cmake -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DWITH_SERVER=OFF \
+      -DWITH_CLIENT=OFF \
+      -DWITH_X11=OFF \
+      -DWITH_WAYLAND=OFF \
+      -DWITH_GSTREAMER=OFF \
+      -DWITH_CUPS=OFF \
+      -DWITH_SMARTCARD=OFF \
+      -DWITH_PULSE=OFF \
+      -DWITH_ALSA=OFF \
+      -DWITH_CODEC=OFF \
+      -DWITH_CHANNELS=ON \
+      -DWITH_OPENSSL=ON \
+      -DWITH_VAAPI_H264_ENCODING=OFF \
+      .. && \
+    ninja && ninja install
+
+###############################
+# Stage 3: guacd builder (1.6.0)
+###############################
+
+FROM resolver-base AS guacd-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    ca-certificates \
+    libcairo2-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libwebp-dev \
+    libavcodec-dev \
+    libavutil-dev \
+    libavformat-dev \
+    libswscale-dev \
+    libpango1.0-dev \
+    libpulse-dev \
+    libvorbis-dev \
+    uuid-dev \
+    \
+    # Option A: Debian dev packages for SSH/RDP/VNC/WebSockets
+    libssh2-1-dev \
+    libssl-dev \
+    libvncserver-dev \
+    libwebsockets-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Bring in FreeRDP from source build (optional but kept)
+COPY --from=freerdp-builder /usr/local /usr/local
+
+WORKDIR /tmp/guacd
+
+COPY guacamole-server-1.6.0.tar.gz ./
+
+RUN tar xf guacamole-server-1.6.0.tar.gz --strip-components=1 && \
+    autoreconf -fi && \
+    PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH \
+    ./configure \
+        --prefix=/usr/local \
+        --disable-guaclog \
+        --disable-guacenc \
+        --enable-ssh \
+        --enable-rdp \
+        --enable-vnc \
+    && make -j"$(nproc)" && \
+    make install && \
+    ldconfig
+
+###############################
+# Stage 4: Runtime base
+###############################
+
+FROM resolver-base AS runtime-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libcairo2 \
+    libjpeg62-turbo \
+    libpng16-16 \
+    libwebp7 \
+    libavcodec61 \
+    libavutil59 \
+    libavformat61 \
+    libswscale8 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libpulse0 \
+    libvorbis0a \
+    libuuid1 \
+    libssl3 \
+    libkrb5-3 \
+    libjson-c5 \
+    libjansson4 \
+    libcjson1 \
+    liburiparser1 \
+    libsystemd0 \
+    libicu76 \
+    libusb-1.0-0 \
+    libfuse3-4 \
+    libssh2-1 \
+    libvncserver1 \
+    libwebsockets19 \
+    fontconfig \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+###############################
+# Stage 5: FINAL RUNTIME
+###############################
+
+FROM resolver-base AS final
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LD_LIBRARY_PATH="/usr/local/lib"
+
+# Bring in runtime libs (Debian)
+COPY --from=runtime-base /usr/lib /usr/lib
+COPY --from=runtime-base /lib /lib
+
+# Bring in fontconfig config/cache (needed for fonts-dejavu-core to
+# actually render -- resolver-base itself never has fontconfig
+# installed, so this has to come from runtime-base explicitly)
+COPY --from=runtime-base /etc/fonts /etc/fonts
+COPY --from=runtime-base /var/cache/fontconfig /var/cache/fontconfig
+
+# Bring in guacd + protocol plugins
+COPY --from=guacd-builder /usr/local /usr/local
+
+COPY reducer/*.sh /opt/reducer/
+RUN chmod +x /opt/reducer/*.sh
+
+EXPOSE 4822
+
+ENTRYPOINT ["/usr/local/sbin/guacd"]
+CMD ["-f", "-b", "0.0.0.0"]
