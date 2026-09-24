@@ -1,0 +1,132 @@
+# ------------------------------------------------------------
+# Hardened PostgreSQL runtime image (nucleus/postgres:<version>)
+# Grafana-pattern: slim baseline -> staged artifacts -> rootfs -> strip -> scratch
+# ------------------------------------------------------------
+
+FROM container-forge/debian13-slim:latest AS builder
+
+ARG POSTGRES_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
+
+ENV PG_PREFIX="/opt/postgresql/${POSTGRES_VERSION}" \
+    PGDATA="/var/lib/postgresql/${POSTGRES_VERSION}/data"
+
+# Runtime dependencies (required for postgres + initdb)
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      libcurl4t64 \
+      libgssapi-krb5-2 \
+      libicu76 \
+      libldap2 \
+      liblz4-1 \
+      libnuma1 \
+      libpam0g \
+      libreadline8t64 \
+      libselinux1 \
+      libssl3t64 \
+      liburing2 \
+      libuuid1 \
+      libxml2 \
+      libxslt1.1 \
+      libzstd1 \
+      locales \
+      tzdata \
+      gosu; \
+    rm -rf /var/lib/apt/lists/*
+
+# Locales
+RUN set -eux; \
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen; \
+    locale-gen en_US.UTF-8
+
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8 \
+    PATH=${PG_PREFIX}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Create postgres user/group and PGDATA directory
+RUN set -eux; \
+    groupadd -g 70 postgres || true; \
+    useradd -u 70 -g 70 -d /var/lib/postgresql -s /usr/sbin/nologin postgres || true; \
+    mkdir -p "${PGDATA}"; \
+    chown -R postgres:postgres /var/lib/postgresql; \
+    chmod 0700 "${PGDATA}"
+
+# Copy staged PostgreSQL runtime (from build quarter staged/, populated by
+# sync-latest-version.sh). staged/ is flat: bin/, include/, lib/, share/,
+# inventory.env sit directly inside it -- no opt/postgresql/<version>
+# nesting. Copied per-subdirectory so inventory.env (pipeline metadata)
+# never ends up in the image.
+COPY --chown=postgres:postgres staged/bin     ${PG_PREFIX}/bin
+COPY --chown=postgres:postgres staged/include ${PG_PREFIX}/include
+COPY --chown=postgres:postgres staged/lib     ${PG_PREFIX}/lib
+COPY --chown=postgres:postgres staged/share   ${PG_PREFIX}/share
+
+# Initialize PGDATA inside builder (so it lands in /var for rootfs export)
+RUN set -eux; \
+    gosu postgres "${PG_PREFIX}/bin/initdb" -D "${PGDATA}"
+
+# Create runtime directories
+RUN set -eux; \
+    mkdir -p /var/run/postgresql; \
+    chown -R postgres:postgres /var/run/postgresql; \
+    chmod 0775 /var/run/postgresql
+
+RUN mkdir -p /docker-entrypoint-initdb.d \
+    && chmod 0755 /docker-entrypoint-initdb.d \
+    && chown -R postgres:postgres /docker-entrypoint-initdb.d
+
+# Build rootfs BEFORE stripping (Grafana pattern)
+RUN mkdir /rootfs && \
+    cp -a /bin /rootfs/bin && \
+    cp -a /lib /rootfs/lib && \
+    cp -a /lib64 /rootfs/lib64 && \
+    cp -a /usr /rootfs/usr && \
+    cp -a /etc /rootfs/etc && \
+    cp -a /var /rootfs/var
+
+# Strip inside rootfs -- hardening only
+RUN rm -rf \
+    /rootfs/var/lib/apt \
+    /rootfs/var/cache/apt \
+    /rootfs/var/lib/dpkg \
+    /rootfs/usr/share/doc \
+    /rootfs/usr/share/man \
+    /rootfs/bin/sh \
+    /rootfs/bin/bash \
+    /rootfs/bin/dash \
+    /rootfs/usr/bin/apt* \
+    /rootfs/usr/bin/dpkg* \
+    /rootfs/usr/bin/lsblk \
+    /rootfs/usr/bin/fdisk \
+    /rootfs/usr/bin/mount \
+    /rootfs/usr/bin/umount \
+    /rootfs/usr/bin/passwd \
+    /rootfs/usr/bin/chage \
+    /rootfs/usr/sbin/useradd \
+    /rootfs/usr/sbin/usermod \
+    /rootfs/bin/gzip \
+    /rootfs/usr/bin/gzip \
+    /rootfs/bin/xz \
+    /rootfs/usr/bin/xz
+
+FROM scratch
+
+ARG POSTGRES_VERSION
+
+LABEL org.opencontainers.image.title="postgres-hardened" \
+      org.opencontainers.image.version="${POSTGRES_VERSION}" \
+      org.opencontainers.image.description="Hardened PostgreSQL runtime image on custom distroless" \
+      org.opencontainers.image.licenses="PostgreSQL"
+
+COPY --from=builder /rootfs/ /
+
+USER 70:70
+WORKDIR /var/lib/postgresql/${POSTGRES_VERSION}/data
+
+EXPOSE 5432
+
+ENTRYPOINT ["/opt/postgresql/${POSTGRES_VERSION}/bin/postgres"]
+CMD ["-D", "/var/lib/postgresql/${POSTGRES_VERSION}/data"]
