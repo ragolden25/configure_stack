@@ -1,0 +1,51 @@
+Dockerfile.nginx.functional
+FROM container-forge/debian13-slim:latest
+
+ARG NGINX_VERSION
+ARG PKG_RELEASE=1
+
+LABEL org.opencontainers.image.title="nginx-functional" \
+      org.opencontainers.image.version="${NGINX_VERSION}" \
+      org.opencontainers.image.description="Functional NGINX image with standard tooling" \
+      org.opencontainers.image.licenses="BSD-2-Clause"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    NGINX_VERSION=${NGINX_VERSION} \
+    PKG_RELEASE=${PKG_RELEASE} \
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin
+
+# 1. Install runtime dependencies and NGINX
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        bash \
+        coreutils \
+        nginx && \
+    rm -rf /var/lib/apt/lists/*
+
+# 2. Create nginx user/group explicitly (your custom .deb no longer creates them)
+RUN groupadd -g 65532 nginx && \
+    useradd -u 65532 -g 65532 -d /var/cache/nginx -s /bin/bash nginx
+
+# 3. Create runtime directories, symlink logs, and set 65532 ownership
+RUN mkdir -p /etc/nginx \
+             /var/log/nginx \
+             /var/cache/nginx \
+             /run/nginx \
+             /usr/share/nginx/html && \
+    ln -sf /dev/stdout /var/log/nginx/access.log && \
+    ln -sf /dev/stderr /var/log/nginx/error.log && \
+    chown -R 65532:65532 /var/cache/nginx \
+                        /etc/nginx \
+                        /run/nginx \
+                        /var/log/nginx \
+                        /usr/share/nginx/html
+
+EXPOSE 80 443
+
+USER 65532:65532
+WORKDIR /usr/share/nginx/html
+
+ENTRYPOINT ["nginx"]
+CMD ["-g", "daemon off;"]
