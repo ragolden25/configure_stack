@@ -32,6 +32,8 @@ RUN apt-get update && \
         libpng16-16 \
         libjpeg62-turbo \
         procps && \
+        openssl \
+        libssl3 \
     rm -rf /var/lib/apt/lists/*
 
 # Remove inherited forge user (UID 1000) if present
