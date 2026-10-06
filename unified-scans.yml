@@ -1,0 +1,21 @@
+---
+- name: Generate unified scan timestamp
+  ansible.builtin.set_fact:
+    unified_scan_timestamp: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
+
+# =====================================================================
+# Unified scan per built image
+# =====================================================================
+
+- name: Run unified scans in parallel
+  ansible.builtin.shell: |
+    # Secure TMPDIR override (STIG-compliant, non-world-writable)
+    export TMPDIR=/opt/ansible/molecule/scans/tmp
+
+    parallel --jobs 6 --colsep ':' "
+      /opt/ansible/files/common/scripts/universal_container_scan.sh \
+        {1} \
+        {2} \
+        {{ grafana_files }} \
+        {{ unified_scan_timestamp }}
+    " ::: {{ all_images | join(' ') }}
